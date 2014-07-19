@@ -3,6 +3,7 @@ from pylab import *
 from astropy.io import fits
 from agpy import readcol#,asinh_norm
 import matplotlib
+from scipy import interpolate
 #import sys
 
 
@@ -99,7 +100,12 @@ def plot_radex(filename,ngridpts=100,ncontours=50,plottype='ratio',
 
     exec('plotdata = %s' % plottype)
 
-    plot_grid = griddata(firstvar[varfilter],secondvar[varfilter],plotdata[varfilter],firstarr,secondarr,interp='linear')
+    #plot_grid = griddata(firstvar[varfilter],secondvar[varfilter],plotdata[varfilter],firstarr,secondarr,interp='linear')
+    plot_grid = interpolate.griddata(np.array([ firstvar[varfilter],
+                                                secondvar[varfilter]
+                                              ]).T,
+                                     plotdata[varfilter],
+                                     tuple(np.meshgrid(firstarr,secondarr)) )
     
     if vmax:
       plot_grid[plot_grid > vmax] = vmax
@@ -123,7 +129,7 @@ def plot_radex(filename,ngridpts=100,ncontours=50,plottype='ratio',
 
 def gridcube(filename, outfilename, var1="density", var2="column",
              var3="temperature", var4=None, plotvar="tau1", zerobads=True,
-             ratio_type='flux'):
+             ratio_type='flux', round=2):
     """
     Reads in a radex_grid.py generated .dat file and turns it into a .fits data cube.
     filename - input .dat filename
@@ -134,10 +140,15 @@ def gridcube(filename, outfilename, var1="density", var2="column",
     """
 
     names,props = readcol(filename,twod=False,names=True)
+    if round:
+        for ii,name in enumerate(names):
+            if name in ('Temperature','log10(dens)','log10(col)','opr'):
+                props[ii] = np.round(props[ii],round)
     if var4 is None:
         temperature,density,column,tex1,tex2,tau1,tau2,tline1,tline2,flux1,flux2 = props
     else:
         temperature,density,column,opr,tex1,tex2,tau1,tau2,tline1,tline2,flux1,flux2 = props
+        opr = np.floor(opr*100)/100.
     if ratio_type == 'flux':
         ratio = flux1 / flux2
     else:
@@ -176,6 +187,7 @@ def gridcube(filename, outfilename, var1="density", var2="column",
         newarr = zeros([nz,ny,nx])
     else:
         newarr = zeros([nw,nz,ny,nx])
+    print "Cube shape will be ",newarr.shape
 
     if zerobads:
         pv = vardict[plotvar]
@@ -185,12 +197,18 @@ def gridcube(filename, outfilename, var1="density", var2="column",
     if var4 is None:
         for ival,val in enumerate(unique(vardict[var3])):
           varfilter = vardict[var3]==val
-          newarr[ival,:,:] = griddata((vardict[var1][varfilter]),(vardict[var2][varfilter]),vardict[plotvar][varfilter],xarr,yarr,interp='linear')
+          #newarr[ival,:,:] = griddata((vardict[var1][varfilter]),(vardict[var2][varfilter]),vardict[plotvar][varfilter],xarr,yarr,interp='linear')
+          newarr[ival,:,:] = interpolate.griddata(np.array([ vardict[var1][varfilter],vardict[var2][varfilter] ]).T,
+                                                  vardict[plotvar][varfilter],
+                                                  tuple(np.meshgrid(xarr,yarr)) )
     else:
         for ival4,val4 in enumerate(unique(vardict[var4])):
             for ival3,val3 in enumerate(unique(vardict[var3])):
               varfilter = (vardict[var3]==val3) * (vardict[var4]==val4)
-              newarr[ival4,ival3,:,:] = griddata((vardict[var1][varfilter]),(vardict[var2][varfilter]),vardict[plotvar][varfilter],xarr,yarr,interp='linear')
+              #newarr[ival4,ival3,:,:] = griddata((vardict[var1][varfilter]),(vardict[var2][varfilter]),vardict[plotvar][varfilter],xarr,yarr,interp='linear')
+              newarr[ival4,ival3,:,:] = interpolate.griddata(np.array([ vardict[var1][varfilter],vardict[var2][varfilter] ]).T,
+                                                             vardict[plotvar][varfilter],
+                                                             tuple(np.meshgrid(xarr,yarr)) )
 
     newfile = fits.PrimaryHDU(newarr)
     if var4 is not None:
