@@ -121,8 +121,9 @@ def plot_radex(filename,ngridpts=100,ncontours=50,plottype='ratio',
     cb.set_ticklabels([1e-3,1e-2,1e-1,1,1e1])
     if save: savefig("%s_%s_%s.png" % (savetype,plottype,transition))
 
-def gridcube(filename,outfilename,var1="density",var2="column",var3="temperature",var4=None,plotvar="tau1",
-        zerobads=True):
+def gridcube(filename, outfilename, var1="density", var2="column",
+             var3="temperature", var4=None, plotvar="tau1", zerobads=True,
+             ratio_type='flux'):
     """
     Reads in a radex_grid.py generated .dat file and turns it into a .fits data cube.
     filename - input .dat filename
@@ -137,7 +138,10 @@ def gridcube(filename,outfilename,var1="density",var2="column",var3="temperature
         temperature,density,column,tex1,tex2,tau1,tau2,tline1,tline2,flux1,flux2 = props
     else:
         temperature,density,column,opr,tex1,tex2,tau1,tau2,tline1,tline2,flux1,flux2 = props
-    ratio = tau1 / tau2
+    if ratio_type == 'flux':
+        ratio = flux1 / flux2
+    else:
+        ratio = tau1 / tau2
 
     vardict = {
       "temperature":temperature,
