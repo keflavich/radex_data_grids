@@ -4,7 +4,11 @@
 import math
 import os
 import time
-#
+import re
+
+# Sometimes, fortran outputs things like "1.404+106" instead of "1.404E+106"
+bad_exp = re.compile("([0-9])\+")
+
 # Run a series of Radex models to estimate temperature & density
 # from observed ratios of H2CO 1-1/2-2, 1-1/3-3, and 2-2/3-3 lines
 #
@@ -106,6 +110,7 @@ def read_radex(outfile,flow,fupp):
     words = line.split()
     while (words[-1] != "FLUX"):
         line  = outfile.readline()
+        line = bad_exp.sub("\\1E+",line)
         words = line.split()
         if words[1] == "T(kin)":
             temp  = float(words[-1])

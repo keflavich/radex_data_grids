@@ -231,8 +231,7 @@ for iact,act in enumerate(acts):
     if verbose > 0: print "Processor %i: Finished writing infiles." % mpirank
     if iact == 0:
         if verbose > 0: print "Processor %i: Starting radex code." % mpirank
-        #status = os.system('%s < radex.inp > /dev/null' % executable)
-        status = 0
+        status = os.system('%s < radex.inp > /dev/null' % executable)
         if status != 0:
             print "Command %s failed with exit status %i" % ('%s < radex.inp > /dev/null' % executable,status)
             import pdb; pdb.set_trace()
