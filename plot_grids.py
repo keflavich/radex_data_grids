@@ -4,6 +4,7 @@ from astropy.io import fits
 from agpy import readcol#,asinh_norm
 import matplotlib
 from scipy import interpolate
+import warnings
 #import sys
 
 
@@ -206,6 +207,9 @@ def gridcube(filename, outfilename, var1="density", var2="column",
             for ival3,val3 in enumerate(unique(vardict[var3])):
               varfilter = (vardict[var3]==val3) * (vardict[var4]==val4)
               #newarr[ival4,ival3,:,:] = griddata((vardict[var1][varfilter]),(vardict[var2][varfilter]),vardict[plotvar][varfilter],xarr,yarr,interp='linear')
+              if np.count_nonzero(varfilter) == 0:
+                  warnings.warn("ERROR: There are no matches for {var3} == {val3} and {var4} == {val4}".format(val3=val3, val4=val4, var3=var3, var4=var4))
+                  continue
               newarr[ival4,ival3,:,:] = interpolate.griddata(np.array([ vardict[var1][varfilter],vardict[var2][varfilter] ]).T,
                                                              vardict[plotvar][varfilter],
                                                              tuple(np.meshgrid(xarr,yarr)) )
