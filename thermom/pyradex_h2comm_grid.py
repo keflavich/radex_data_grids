@@ -1,10 +1,18 @@
 """
 Create some simple grids for the 1mm para-H2CO lines
+
+Used in the apex_h2co_mm project
+
 """
 import pyradex
+import pyradex.fjdu
 import numpy as np
 from astropy.utils.console import ProgressBar
 from astropy.io import fits
+from astropy import log
+import warnings
+# Make sure warnings are only shown once so the progressbar doesn't get flooded
+warnings.filterwarnings('once')
 
 ntemp,ndens,ncol = 50,20,20
 
@@ -22,38 +30,46 @@ if not os.path.exists('ph2co-h2.dat'):
     import urllib
     urllib.urlretrieve('http://home.strw.leidenuniv.nl/~moldata/datafiles/ph2co-h2.dat')
 
-# 1e23 from Johnston 2014
-R = pyradex.Radex(species='ph2co-h2', abundance=abundance, h2column=1e23,
-                  temperature=50,
-                  collider_densities={'oH2':2e4*fortho,'pH2':2e4*(1-fortho)})
-print R.escapeProbGeom # DEBUG
-R.run_radex()
-R.maxiter = 200
-
-# get the table so we can look at the frequency grid
-table = R.get_table()
-
-# Target frequencies:
-table[np.array([6,1,11])].pprint()
-
-key_303 = np.where((table['upperlevel'] == '3_0_3') &
-                   (table['frequency'] > 218) &
-                   (table['frequency'] < 220))[0]
-key_321 = np.where((table['upperlevel'] == '3_2_1') &
-                   (table['frequency'] > 218) &
-                   (table['frequency'] < 220))[0]
-key_322 = np.where((table['upperlevel'] == '3_2_2') &
-                   (table['frequency'] > 218) &
-                   (table['frequency'] < 220))[0]
-
-bad_pars = []
-
 def compute_grid(densities=densities, temperatures=temperatures,
                  columns=columns, fortho=fortho, deltav=5.0,
-                 escapeProbGeom='lvg',
-                 R=R):
+                 escapeProbGeom='lvg', Radex=pyradex.Radex,
+                 run_kwargs={'reuse_last': True, 'reload_molfile': False}):
 
-    R.escapeProbGeom=escapeProbGeom
+    # Initialize the RADEX fitter with some reasonable parameters
+    R = Radex(species='ph2co-h2',
+              column=1e14,
+              temperature=50,
+              escapeProbGeom=escapeProbGeom,
+              collider_densities={'oH2':2e4*fortho,'pH2':2e4*(1-fortho)})
+
+    R.run_radex()
+    R.maxiter = 200
+
+    # get the table so we can look at the frequency grid
+    table = R.get_table()
+
+    # Get warnings about temperature early
+    R.temperature = temperatures.min()
+    R.temperature = temperatures.max()
+
+    # Target frequencies:
+    #table[np.array([6,1,11])].pprint()
+
+    key_303 = 2
+    key_321 = 9
+    key_322 = 12
+    #key_303 = np.where((table['upperlevel'] == '3_0_3') &
+    #                   (table['frequency'] > 218) &
+    #                   (table['frequency'] < 220))[0]
+    #key_321 = np.where((table['upperlevel'] == '3_2_1') &
+    #                   (table['frequency'] > 218) &
+    #                   (table['frequency'] < 220))[0]
+    #key_322 = np.where((table['upperlevel'] == '3_2_2') &
+    #                   (table['frequency'] > 218) &
+    #                   (table['frequency'] < 220))[0]
+
+    # used to assess where the grid failed
+    bad_pars = []
 
     ndens = len(densities)
     ntemp = len(temperatures)
@@ -81,7 +97,8 @@ def compute_grid(densities=densities, temperatures=temperatures,
                 #R.abundance = abundance # reset column to the appropriate value
                 R.column_per_bin = 10**cc
                 R.deltav = deltav
-                niter = R.run_radex(reuse_last=False, reload_molfile=True)
+                #niter = R.run_radex(reuse_last=False, reload_molfile=True)
+                niter = R.run_radex(**run_kwargs)
 
                 if niter == R.maxiter:
                     bad_pars.append([tt,dd,cc])
@@ -97,7 +114,7 @@ def compute_grid(densities=densities, temperatures=temperatures,
                 pars['texgrid_322'][kk,jj,ii] = R.tex[key_322].value
                 pars['fluxgrid_322'][kk,jj,ii] = TI[key_322].value
 
-    return (TI, pars)
+    return (TI, pars, bad_pars)
 
 def makefits(data, btype, densities=densities, temperatures=temperatures,
              columns=columns, ):
@@ -126,8 +143,22 @@ if __name__ == "__main__":
     import re
     bt = re.compile("tex|tau|flux")
 
-    (TI, pars) = compute_grid()
+    (fTI, fpars, fbad_pars) = compute_grid(Radex=pyradex.fjdu.Fjdu,
+                                           run_kwargs={})
     
+    for pn in fpars:
+        btype = bt.search(pn).group()
+        ff = makefits(fpars[pn], btype, densities=densities,
+                      temperatures=temperatures, columns=columns)
+        outfile = 'fjdu_pH2CO_{line}_{type}_{dv}.fits'.format(line=pn[-3:],
+                                                              type=btype,
+                                                              dv='5kms')
+        ff.writeto(outfile,
+                   clobber=True)
+        print outfile
+
+    (TI, pars, bad_pars) = compute_grid()
+
     for pn in pars:
         btype = bt.search(pn).group()
         ff = makefits(pars[pn], btype, densities=densities,
@@ -138,3 +169,20 @@ if __name__ == "__main__":
         ff.writeto(outfile,
                    clobber=True)
         print outfile
+
+    log.info("FJDU had {0} bad pars".format(len(fbad_pars)))
+    log.info("RADEX had {0} bad pars".format(len(bad_pars)))
+    
+
+    # look at differences
+    for pn in pars:
+        btype = bt.search(pn).group()
+        outfile = 'pH2CO_{line}_{type}_{dv}.fits'.format(line=pn[-3:],
+                                                          type=btype,
+                                                          dv='5kms')
+        header = fits.getheader(outfile)
+        im1 = fits.getdata('fjdu_'+outfile)
+        im2 = fits.getdata(outfile)
+        hdu = fits.PrimaryHDU(data=im1-im2, header=header)
+        hdu.writeto('diff_fjdu-radex_'+outfile, clobber=True)
+
