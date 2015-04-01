@@ -20,7 +20,7 @@ ntemp,ndens,ncol = 50,20,30
 
 temperatures = np.linspace(10,350,ntemp)
 densities = np.linspace(2.5,7,ndens)
-columns = np.linspace(11, 17, ncol)
+columns = np.linspace(11, 15.1, ncol)
 abundance = 10**-8.5
 abundance = 1.2e-9 # Johnston / Ao
 opr = 0.01 # assume primarily para
@@ -60,6 +60,9 @@ def compute_grid(densities=densities, temperatures=temperatures,
     key_303 = 2
     key_321 = 9
     key_322 = 12
+    key_404 = 3
+    key_423 = 16
+    key_422 = 19
     #key_303 = np.where((table['upperlevel'] == '3_0_3') &
     #                   (table['frequency'] > 218) &
     #                   (table['frequency'] < 220))[0]
@@ -89,6 +92,15 @@ def compute_grid(densities=densities, temperatures=temperatures,
         taugrid_322 = np.full(shape, np.nan),
         texgrid_322 = np.full(shape, np.nan),
         fluxgrid_322 = np.full(shape, np.nan),
+        taugrid_404 = np.full(shape, np.nan),
+        texgrid_404 = np.full(shape, np.nan),
+        fluxgrid_404 = np.full(shape, np.nan),
+        taugrid_423 = np.full(shape, np.nan),
+        texgrid_423 = np.full(shape, np.nan),
+        fluxgrid_423 = np.full(shape, np.nan),
+        taugrid_422 = np.full(shape, np.nan),
+        texgrid_422 = np.full(shape, np.nan),
+        fluxgrid_422 = np.full(shape, np.nan),
     )
 
     for iTem,tt in enumerate(ProgressBar(temperatures)):
@@ -115,6 +127,15 @@ def compute_grid(densities=densities, temperatures=temperatures,
                 pars['taugrid_322'][iTem,iDens,iCol] = R.tau[key_322]
                 pars['texgrid_322'][iTem,iDens,iCol] = R.tex[key_322].value
                 pars['fluxgrid_322'][iTem,iDens,iCol] = TI[key_322].value
+                pars['taugrid_404'][iTem,iDens,iCol] = R.tau[key_404]
+                pars['texgrid_404'][iTem,iDens,iCol] = R.tex[key_404].value
+                pars['fluxgrid_404'][iTem,iDens,iCol] = TI[key_404].value
+                pars['taugrid_422'][iTem,iDens,iCol] = R.tau[key_422]
+                pars['texgrid_422'][iTem,iDens,iCol] = R.tex[key_422].value
+                pars['fluxgrid_422'][iTem,iDens,iCol] = TI[key_422].value
+                pars['taugrid_423'][iTem,iDens,iCol] = R.tau[key_423]
+                pars['texgrid_423'][iTem,iDens,iCol] = R.tex[key_423].value
+                pars['fluxgrid_423'][iTem,iDens,iCol] = TI[key_423].value
 
     return (TI, pars, bad_pars)
 
@@ -147,6 +168,7 @@ def makefits(data, btype, densities=densities, temperatures=temperatures,
 
 if __name__ == "__main__":
     import re
+    from paths import gpath
     bt = re.compile("tex|tau|flux")
 
     (fTI, fpars, fbad_pars) = compute_grid(Radex=pyradex.fjdu.Fjdu,
@@ -159,7 +181,7 @@ if __name__ == "__main__":
         outfile = 'fjdu_pH2CO_{line}_{type}_{dv}.fits'.format(line=pn[-3:],
                                                               type=btype,
                                                               dv='5kms')
-        ff.writeto(outfile,
+        ff.writeto(gpath(outfile),
                    clobber=True)
         print outfile
 
@@ -169,7 +191,7 @@ if __name__ == "__main__":
     outfile = 'fjdu_pH2CO_{line}_{type}_{dv}.fits'.format(line='321to303',
                                                           type='ratio',
                                                           dv='5kms')
-    ff.writeto(outfile, clobber=True)
+    ff.writeto(gpath(outfile), clobber=True)
 
     (TI, pars, bad_pars) = compute_grid()
 
@@ -180,7 +202,7 @@ if __name__ == "__main__":
         outfile = 'pH2CO_{line}_{type}_{dv}.fits'.format(line=pn[-3:],
                                                           type=btype,
                                                           dv='5kms')
-        ff.writeto(outfile,
+        ff.writeto(gpath(outfile),
                    clobber=True)
         print outfile
 
@@ -189,7 +211,7 @@ if __name__ == "__main__":
     outfile = 'pH2CO_{line}_{type}_{dv}.fits'.format(line='321to303',
                                                           type='ratio',
                                                           dv='5kms')
-    ff.writeto(outfile, clobber=True)
+    ff.writeto(gpath(outfile), clobber=True)
 
     log.info("FJDU had {0} bad pars".format(len(fbad_pars)))
     log.info("RADEX had {0} bad pars".format(len(bad_pars)))
@@ -201,9 +223,9 @@ if __name__ == "__main__":
         outfile = 'pH2CO_{line}_{type}_{dv}.fits'.format(line=pn[-3:],
                                                           type=btype,
                                                           dv='5kms')
-        header = fits.getheader(outfile)
-        im1 = fits.getdata('fjdu_'+outfile)
-        im2 = fits.getdata(outfile)
+        header = fits.getheader(gpath(outfile))
+        im1 = fits.getdata(gpath('fjdu_'+outfile))
+        im2 = fits.getdata(gpath(outfile))
         hdu = fits.PrimaryHDU(data=im1-im2, header=header)
-        hdu.writeto('diff_fjdu-radex_'+outfile, clobber=True)
+        hdu.writeto(gpath('diff_fjdu-radex_'+outfile), clobber=True)
 
